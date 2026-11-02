@@ -397,17 +397,26 @@ const App = (() => {
     const panel = document.getElementById('ai-result-panel');
     if (!panel) return;
 
+    const items = Array.isArray(result?.items) ? result.items : [];
+    let totalCal = parseInt(result?.total_calories ?? result?.calories ?? 0);
+    if (isNaN(totalCal) || totalCal === 0) {
+      totalCal = items.reduce((sum, item) => sum + (parseInt(item.calories) || 0), 0);
+    }
+    const defaultName = items.map(i => i.name || i.item || '').filter(Boolean).join(', ') || 'Food';
+
     let html = `<div class="ai-result-inner">
       <div class="ai-result-title">🤖 AI Estimate</div>`;
 
-    (result.items || []).forEach(item => {
-      html += `<div class="ai-item">
-        <span>${escHtml(item.name)}</span>
-        <span class="ai-cal">${item.calories} kcal</span>
-      </div>`;
-    });
+    if (items.length > 0) {
+      items.forEach(item => {
+        html += `<div class="ai-item">
+          <span>${escHtml(item.name || item.item || 'Food')}</span>
+          <span class="ai-cal">${item.calories || 0} kcal</span>
+        </div>`;
+      });
+    }
 
-    html += `<div class="ai-total">Total: <strong>${result.total_calories} kcal</strong></div>`;
+    html += `<div class="ai-total">Total: <strong>${totalCal} kcal</strong></div>`;
 
     if (result.notes) {
       html += `<div class="ai-notes">${escHtml(result.notes)}</div>`;
@@ -417,29 +426,31 @@ const App = (() => {
     html += `
       <div class="ai-edit-row">
         <label>Adjust calories:</label>
-        <input type="number" id="ai-cal-edit" class="cal-edit-input" value="${result.total_calories}" min="0" max="9999">
+        <input type="number" id="ai-cal-edit" class="cal-edit-input" value="${totalCal}" min="0" max="9999">
       </div>
       <div class="ai-edit-row">
         <label>Name / description:</label>
-        <input type="text" id="ai-name-edit" class="cal-edit-input" value="${escHtml((result.items || []).map(i => i.name).join(', '))}">
+        <input type="text" id="ai-name-edit" class="cal-edit-input" value="${escHtml(defaultName)}">
       </div>
-      <button class="primary-btn" onclick="App.confirmAIFood()">✅ Log This</button>
+      <button class="primary-btn" onclick="App.confirmAIFood()" style="margin-top:8px">✅ Log ${totalCal} kcal</button>
       <button class="text-btn" onclick="App.dismissAIResult()">Cancel</button>
     </div>`;
 
     panel.innerHTML  = html;
     panel.classList.remove('hidden');
-    panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    setTimeout(() => {
+      panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }, 50);
   }
 
   function confirmAIFood() {
     const calories = parseInt(document.getElementById('ai-cal-edit')?.value) || 0;
-    const name     = document.getElementById('ai-name-edit')?.value || 'Food';
+    const name     = document.getElementById('ai-name-edit')?.value?.trim() || 'Food';
     const source   = activeFoodMode;
 
     Store.addFoodEntry({ name, calories, source });
     pendingAI = null;
-    showToast(`✅ Logged ${calories} kcal`);
+    showToast(`✅ Logged ${calories} kcal!`);
     navigateTo('log-in');
   }
 
@@ -454,8 +465,14 @@ const App = (() => {
   }
 
   function showAILoading(show) {
-    document.getElementById('ai-loading')?.classList.toggle('hidden', !show);
-    document.getElementById('ai-result-panel')?.classList.add('hidden');
+    const loadingEl = document.getElementById('ai-loading');
+    if (loadingEl) {
+      loadingEl.classList.toggle('hidden', !show);
+    }
+    // Only hide the result panel when STARTING to load
+    if (show) {
+      document.getElementById('ai-result-panel')?.classList.add('hidden');
+    }
   }
 
   // ── Log OUT ────────────────────────────────────────────────────────────────
