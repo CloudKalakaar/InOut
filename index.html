@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="InOut">
+  <meta name="theme-color" content="#FF7A00">
+  <meta name="description" content="Simple fitness calorie tracker — log what you eat (IN) and what you burn (OUT).">
+
+  <title>InOut</title>
+
+  <!-- PWA Manifest -->
+  <link rel="manifest" href="./manifest.json">
+
+  <!-- Apple touch icons (iOS Add to Home Screen) -->
+  <link rel="apple-touch-icon" href="./icons/icon-152.png">
+  <link rel="apple-touch-icon" sizes="152x152" href="./icons/icon-152.png">
+  <link rel="apple-touch-icon" sizes="192x192" href="./icons/icon-192.png">
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" sizes="192x192" href="./icons/icon-192.png">
+  <link rel="icon" type="image/png" sizes="32x32"   href="./icons/icon-96.png">
+
+  <!-- Stylesheet -->
+  <link rel="stylesheet" href="./css/app.css">
+
+  <!-- Preconnect for API -->
+  <link rel="preconnect" href="https://api.x.ai">
+</head>
+<body>
+
+  <!-- Main content area (views rendered here by JS) -->
+  <main id="main-content" role="main">
+    <!-- Loading state shown before JS boots -->
+    <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;gap:20px">
+      <img src="./file_000000006c20820bbf1241cf786592e2.png" alt="InOut" style="width:96px;height:96px;border-radius:22px;object-fit:contain;background:#fff;padding:8px">
+      <div style="width:32px;height:32px;border:3px solid #2E3550;border-top-color:#FF7A00;border-radius:50%;animation:spin 0.7s linear infinite"></div>
+      <style>@keyframes spin{to{transform:rotate(360deg)}}</style>
+    </div>
+  </main>
+
+  <!-- Bottom navigation (rendered by JS) -->
+  <nav id="bottom-nav" role="navigation" aria-label="Main navigation"></nav>
+
+  <!-- Scripts: load in dependency order -->
+  <script src="./js/store.js"></script>
+  <script src="./js/exercises.js"></script>
+  <script src="./js/ai.js"></script>
+  <script src="./js/calendar.js"></script>
+  <script src="./js/app.js"></script>
+
+</body>
+</html>
