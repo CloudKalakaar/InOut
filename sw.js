@@ -2,8 +2,8 @@
 // Service Worker — Cache-first with background refresh (stale-while-revalidate)
 // Version bump here triggers cache purge on next install
 
-const CACHE_NAME    = 'inout-v1.0.0';
-const NETWORK_ONLY  = ['api.x.ai'];  // Never cache API calls
+const CACHE_NAME    = 'inout-v1.0.1';
+const NETWORK_ONLY  = ['api.x.ai', 'api.groq.com'];  // Never cache API calls
 
 const APP_SHELL = [
   './',

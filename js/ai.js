@@ -1,6 +1,6 @@
 // ── InOut · ai.js ─────────────────────────────────────────────────────────────
 // AI integration for calorie estimation from food photos or text descriptions.
-// Supports both xAI (Grok) and Groq API keys via OpenAI-compatible endpoints.
+// Supports Groq Cloud (free, fast) and xAI (Grok) via OpenAI-compatible endpoints.
 // API key is stored safely in the user's browser localStorage (via Settings).
 
 const AI = (() => {
@@ -18,72 +18,95 @@ Be realistic with portion sizes. If unsure, provide a reasonable conservative es
     const key = (settings.apiKey || '').trim();
 
     if (!key) {
-      throw new Error('Please add your AI API key in Settings ⚙️ (xAI or Groq supported).');
+      throw new Error('Please add your AI API key in Settings ⚙️ (Groq or xAI supported).');
     }
 
     if (key.startsWith('gsk_')) {
-      // Groq Cloud endpoint
+      // Groq Cloud endpoint — qwen/qwen3.8-27b handles both text and vision, gpt-oss-120b fallback
       return {
         key,
+        provider: 'groq',
         baseUrl: 'https://api.groq.com/openai/v1/chat/completions',
-        modelVision: 'llama-3.2-11b-vision-preview',
-        modelText: 'llama-3.3-70b-versatile'
+        modelVision: 'qwen/qwen3.8-27b',
+        modelText: 'qwen/qwen3.8-27b',
+        modelTextFallback: 'openai/gpt-oss-120b'
       };
     }
 
     // Default to xAI Grok endpoint
     return {
       key,
+      provider: 'xai',
       baseUrl: 'https://api.x.ai/v1/chat/completions',
       modelVision: 'grok-4',
       modelText: 'grok-4',
-      modelVisionFallback: 'grok-2-vision-1212'
+      modelVisionFallback: 'grok-2-vision-1212',
+      modelTextFallback: 'grok-2-1212'
     };
   }
 
   // ── Shared fetch wrapper ───────────────────────────────────────────────────
   async function callAPI(messages, overrideModel = null) {
     const creds = getCredentials();
-    const model = overrideModel || creds.modelText;
+    const primaryModel = overrideModel || creds.modelText;
 
-    const resp = await fetch(creds.baseUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${creds.key}`
-      },
-      body: JSON.stringify({
-        model,
+    async function executeRequest(modelName) {
+      const payload = {
+        model: modelName,
         messages,
         max_tokens: 600,
         temperature: 0.2
-      })
-    });
+      };
 
-    if (!resp.ok) {
-      const errText = await resp.text();
-      let msg = `API error ${resp.status}`;
-      try {
-        const j = JSON.parse(errText);
-        msg = j.error?.message || errText;
-      } catch {
-        msg = errText;
+      if (creds.provider === 'groq') {
+        payload.response_format = { type: 'json_object' };
       }
-      throw new Error(msg);
+
+      const resp = await fetch(creds.baseUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${creds.key}`
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (!resp.ok) {
+        const errText = await resp.text();
+        let msg = `API error ${resp.status}`;
+        try {
+          const j = JSON.parse(errText);
+          msg = j.error?.message || errText;
+        } catch {
+          msg = errText;
+        }
+        throw new Error(msg);
+      }
+
+      const data = await resp.json();
+      const raw = data.choices?.[0]?.message?.content || '';
+
+      // Strip markdown code fences if model wraps response
+      const cleaned = raw.replace(/```json\s*/gi, '').replace(/```/g, '').trim();
+
+      try {
+        return JSON.parse(cleaned);
+      } catch {
+        const match = cleaned.match(/\{[\s\S]*\}/);
+        if (match) return JSON.parse(match[0]);
+        throw new Error('Could not parse AI response: ' + cleaned);
+      }
     }
 
-    const data = await resp.json();
-    const raw = data.choices?.[0]?.message?.content || '';
-
-    // Strip markdown code fences if model wraps response
-    const cleaned = raw.replace(/```json\s*/gi, '').replace(/```/g, '').trim();
-
     try {
-      return JSON.parse(cleaned);
-    } catch {
-      const match = cleaned.match(/\{[\s\S]*\}/);
-      if (match) return JSON.parse(match[0]);
-      throw new Error('Could not parse AI response: ' + cleaned);
+      return await executeRequest(primaryModel);
+    } catch (err) {
+      // If primary model failed and we have a text fallback, try it
+      if (!overrideModel && creds.modelTextFallback && creds.modelTextFallback !== primaryModel) {
+        console.warn(`Primary model ${primaryModel} failed (${err.message}), trying fallback ${creds.modelTextFallback}...`);
+        return await executeRequest(creds.modelTextFallback);
+      }
+      throw err;
     }
   }
 
@@ -97,7 +120,7 @@ Be realistic with portion sizes. If unsure, provide a reasonable conservative es
         content: [
           {
             type: 'text',
-            text: 'Analyze this food photo. List each identified food item and its estimated calories. Return ONLY the JSON object.'
+            text: 'Analyze this food photo. List each identified food item and its estimated calories. Return ONLY valid JSON format: {"items":[{"name":"item","calories":100}],"total_calories":100}'
           },
           {
             type: 'image_url',
@@ -131,7 +154,7 @@ Be realistic with portion sizes. If unsure, provide a reasonable conservative es
       { role: 'system', content: SYSTEM },
       {
         role: 'user',
-        content: `Estimate calories for this meal: "${text}". Return ONLY the JSON format specified.`
+        content: `Estimate calories for this food/drink: "${text}". Return ONLY valid JSON: {"items":[{"name":"item","calories":100}],"total_calories":100}`
       }
     ];
     return await callAPI(messages, creds.modelText);

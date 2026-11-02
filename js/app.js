@@ -11,11 +11,19 @@ const App = (() => {
 
   // ── Init ───────────────────────────────────────────────────────────────────
   function init() {
-    // Register service worker
+    // Register service worker with auto-update
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('./sw.js')
-        .then(() => console.log('[SW] Registered'))
-        .catch(e => console.warn('[SW] Registration failed:', e));
+      navigator.serviceWorker.register('./sw.js').then(reg => {
+        reg.update();
+      }).catch(e => console.warn('[SW] Registration failed:', e));
+
+      let refreshing = false;
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (!refreshing) {
+          refreshing = true;
+          window.location.reload();
+        }
+      });
     }
 
     // Bootstrap settings if first run
